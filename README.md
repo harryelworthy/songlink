@@ -3,7 +3,7 @@
 
 This should ideally be a one-interaction site. First song I click, I pick my streaming choice, then every time after I get that service. Main site I can change my preferences. DB of song links is obviously key, Spotify/AM etc API's can work with this. Search page also key. 
 
-Going to use flask to first mock up, as I have a bit of experience there, should probably use something .js or rails or whatever the cool kids are using if I really want to build this. Not too important right now.
+Going to use flask to first mock up, as I have a bit of experience there and it's small and simple, should probably use something .js or rails or whatever the cool kids are using if I really want to build this. Not too important right now. How tough can a three function site be?!
 
 To Do:
 
