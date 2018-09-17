@@ -12,6 +12,8 @@ from .db import get_db, init_db
 
 from .forms import MusicSearchForm
 
+from .tables import Results
+
 bp = Blueprint('song', __name__, url_prefix='/s')
 
 client_id = "8cf3536e2878430ba6f2ae0755ddcfcf"
@@ -27,12 +29,12 @@ def get_spotify_results(search):
 
 def add_spotify_results_db(result):
     # Need to make loop through all results
-
-    name = result['tracks']['items'][0]['name']
-    artist = result['tracks']['items'][0]['artists'][0]['name']
-    album = result['tracks']['items'][0]['album']['name']
-    url = result['tracks']['items'][0]['uri']
-    add_to_db(name, artist, album, url)
+    for item in result['tracks']['items']:
+        name = result['tracks']['items'][0]['name']
+        artist = result['tracks']['items'][0]['artists'][0]['name']
+        album = result['tracks']['items'][0]['album']['name']
+        url = result['tracks']['items'][0]['uri']
+        add_to_db(name, artist, album, url)
     return
 
 def add_to_db(name, artist, album, sp_url):
@@ -81,21 +83,27 @@ def search_page():
 
 @bp.route('/results')
 def search_results(search):
+    db = get_db()
     results = []
     search_string = search.data['search']
     if True: #search.data['search'] == ''
-        """
-        qry = db_session.query(search_string)
-        results = qry.all()
-        """
-        results = get_spotify_results(search_string)
-        add_spotify_results_db(results)
-        results = ['hello']
+        spsearch = get_spotify_results(search_string)
+        add_spotify_results_db(spsearch)
+        radiohead = 'radiohead'
+        results = db.execute(
+            "SELECT * FROM song"
+            "WHERE (artist LIKE 'radiohead')"
+            "OR (album LIKE 'radiohead')"
+        )
+
+        #results = ['hello']
 
     if not results:
         flash('No results found!')
         return redirect('/a')
     else:
-        # display results
-        return render_template('results.html', results=results)
+        # display results        
+        table = Results(results)
+        table.border = True
+        return render_template('results.html', table=table)
 
