@@ -4,7 +4,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
 
 from flask import (
-    Blueprint, flash, g, redirect, render_template, request, session, url_for, make_response
+    Blueprint, flash, g, redirect, render_template, request, session, url_for, make_response, abort
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -25,33 +25,45 @@ def get_spotify_results(search):
     sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
     return sp.search(search)
 
+@bp.route('/<uri>/', methods=['GET'])
+def relink(uri):
+    url = generate_link(uri, 1)
+    if not url:
+        abort(400, 'No song found')
+    return make_response(redirect(url))
 
 
 def add_spotify_results_db(result):
     # Need to make loop through all results
     for item in result['tracks']['items']:
-        name = result['tracks']['items'][0]['name']
-        artist = result['tracks']['items'][0]['artists'][0]['name']
-        album = result['tracks']['items'][0]['album']['name']
-        url = result['tracks']['items'][0]['uri']
-        add_to_db(name, artist, album, url)
+        name = item['name']
+        artist = item['artists'][0]['name']
+        album = item['album']['name']
+        uri = item['id']
+        add_to_db(name, artist, album, uri)
+        print(name)
     return
 
-def add_to_db(name, artist, album, sp_url):
+def add_to_db(name, artist, album, uri):
     db = get_db()
-    db.execute(
-        'INSERT INTO song (title, artist, album, spotify, link, type)'
-        ' VALUES (?, ?, ?, ?, ?, ?)',
-        (name, artist, album, sp_url, 0, '')
-    )
+    if db.execute('SELECT uri FROM song WHERE uri = ?', (uri,)).fetchone() is None:
+        db.execute(
+            'INSERT INTO song (title, artist, album, uri) VALUES (?, ?, ?, ?)', (name, artist, album, uri)
+        )
     db.commit()
     return
 
-def generate_link(songlink, pref):
-	link = None
-	if pref == 1:
-		link = db.execute('SELECT spotify FROM song WHERE link = ?', (songlink,)).fetchone()
-	return link
+def generate_link(uri, pref):
+    link = None
+    db = get_db()
+    if db.execute(
+            'SELECT uri FROM song WHERE uri = ?', (uri,)
+        ).fetchone() is None:
+        return None
+
+    if pref == 1:
+        link = "https://open.spotify.com/track/" + uri
+    return link
 
 @bp.route('/firsttime')
 def first_time(songid):
@@ -60,16 +72,6 @@ def first_time(songid):
 	# Create new user, set preference, get ID
 	resp.set_cookie('user', userid)
 	return resp
-
-@bp.route('/<songlink>')
-def relink(songlink):
-    # Redirect user to their link of choice
-    resp = make_response(None)
-
-    link = generate_link(songlink, 1)
-    resp = make_response(redirect(link))
-
-    return resp
 
 
 
@@ -89,11 +91,8 @@ def search_results(search):
     if True: #search.data['search'] == ''
         spsearch = get_spotify_results(search_string)
         add_spotify_results_db(spsearch)
-        radiohead = 'radiohead'
         results = db.execute(
-            "SELECT * FROM song"
-            "WHERE (artist LIKE 'radiohead')"
-            "OR (album LIKE 'radiohead')"
+            "SELECT * FROM song WHERE (artist LIKE '%" + search_string + "%') OR (album LIKE '%" + search_string + "%') OR (title LIKE '%" + search_string + "%')"
         )
 
         #results = ['hello']
